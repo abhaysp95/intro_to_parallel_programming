@@ -9,7 +9,7 @@ const pool_size = 10;
 
 fn hello(rank: usize, t: u8) void {
     std.time.sleep(@as(u64, t) * 1_000_000_000);
-    dprint("hello after sleeping for {}, from thread {} of {}\n", .{ t, rank, pool_size });
+    dprint("hello after sleeping for {} seconds, from thread {} of {}\n", .{ t, rank, pool_size });
 }
 
 pub fn main() !void {
