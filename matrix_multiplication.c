@@ -18,9 +18,15 @@ struct row_range {
 
 void *mul_mat(void *args) {
   struct row_range *my_args = (struct row_range *)args;
-  for (unsigned row = my_args->start; row < my_args->end; row++) {
+#ifdef DEBUG
+  printf("args recieved: %d, %d\n", my_args->start, my_args->end);
+#endif
+  for (unsigned row = my_args->start; row <= my_args->end; row++) {
     long sum = 0;
     for (unsigned col = 0; col < c1; col++) {
+#ifdef DEBUG
+      printf("multiplying mat1[%d][%d] = %d and mat2[%d] = %d\n", row, col, mat1[row][col], col, mat2[col]);
+#endif
       sum += (mat1[row][col] * mat2[col]);
     }
     res[row][0] = sum;
@@ -50,23 +56,39 @@ int main(int argc, char **argv) {
   unsigned parts = r1 / ncpus;
   pthread_t* thread_pool = malloc(sizeof(pthread_t) * ncpus);
 
-  for (unsigned t = 0; t < ncpus; t++) {
-    struct row_range args = {
-      .start = t * parts,
-      .end = (t + 1) * parts - 1,
-    };
-    unsigned start = t * parts;
-    unsigned end = (t + 1) * parts - 1;
-    if (pthread_create(&thread_pool[t], NULL, mul_mat, (void *)&args) != 0) {
+  unsigned spawned_thread_count = r1 < ncpus ? r1 : ncpus;
+  struct row_range *args = malloc(sizeof(struct row_range) * spawned_thread_count);
+
+  unsigned start = 0, end = 0;
+  for (unsigned t = 0; t < spawned_thread_count; t++) {
+    end = (parts) - 1;
+    int rem = r1 % ncpus;
+    if (rem != 0 && rem - 1 >= t) {  // this tells that remainder rows are included in thread or not
+      end += 1;
+    }
+    end += start;
+    args[t].start = start;
+    args[t].end = end;
+    start = end + 1;
+  }
+#ifdef DEBUG
+  for (unsigned t = 0; t < spawned_thread_count; t++) {
+    printf("args[%d].start = %d, args[%d].end = %d\n", t, args[t].start, t, args[t].end);
+  }
+#endif
+  for (unsigned t = 0; t < spawned_thread_count; t++) {
+    printf("Starting thread t#%d, with start: %d, end: %d\n", t, args[t].start, args[t].end);
+    if (pthread_create(&thread_pool[t], NULL, mul_mat, (void *)&args[t]) != 0) {
       printf("Error occured in spawning thread. Exiting!!!\n");
       return EXIT_FAILURE;
     }
   }
 
-  for (unsigned t = 0; t < ncpus; t++) {
+  for (unsigned t = 0; t < spawned_thread_count; t++) {
     pthread_join(thread_pool[t], NULL);
   }
   free(thread_pool);
+  free(args);
 
   printf("Resultant Matrix: \n");
   for (unsigned i = 0; i < r1; i++) {
@@ -77,13 +99,22 @@ int main(int argc, char **argv) {
   return EXIT_SUCCESS;
 }
 
-// printf("Enter number of rows [multiple of %d]: \n", ncpus);
-// int rows = 0;
-// scanf("%d", &rows);
-//
-// int parts = rows / ncpus;
-// for (unsigned i = 0; i < ncpus; i++) {
-//   int start = i * parts;
-//   int end = (i + 1) * parts - 1;
-//   printf("start: %d, end: %d\n", start, end);
-// }
+// input
+// 16 5
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 2 3 4 5 6
+// 7 8 9 0 1
